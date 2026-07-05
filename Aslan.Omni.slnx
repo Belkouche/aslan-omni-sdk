@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Aslan.Omni/Aslan.Omni.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Aslan.Omni.Tests/Aslan.Omni.Tests.csproj" />
+  </Folder>
+</Solution>

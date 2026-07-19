@@ -80,6 +80,10 @@ public sealed class OmniClient : IDisposable
             isPairedFunc: id => _store.ExistsAsync(id, ct),
             ct: ct);
 
+    /// <summary>Returns true if a pairing token for <paramref name="terminalId"/> is stored locally.</summary>
+    public Task<bool> HasTokenAsync(string terminalId, CancellationToken ct = default)
+        => _store.ExistsAsync(terminalId, ct);
+
     // -------------------------------------------------------------------------
     // Pairing
     // -------------------------------------------------------------------------
@@ -258,7 +262,7 @@ public sealed class OmniClient : IDisposable
     {
         var uri = new Uri(TerminalBase(token), path);
         var bodyBytes = JsonSerializer.SerializeToUtf8Bytes(bodyObj, _json);
-        var tokenSecret = Convert.FromBase64String(token.TokenSecret);
+        var tokenSecret = HexToBytes(token.TokenSecret);
         var authHeader = OmniSigner.BuildHeader(token.TokenId, tokenSecret, "POST", path, bodyBytes);
 
         using var req = new HttpRequestMessage(HttpMethod.Post, uri);
@@ -291,7 +295,7 @@ public sealed class OmniClient : IDisposable
         var bodyBytes = bodyObj != null
             ? JsonSerializer.SerializeToUtf8Bytes(bodyObj, _json)
             : Array.Empty<byte>();
-        var tokenSecret = Convert.FromBase64String(token.TokenSecret);
+        var tokenSecret = HexToBytes(token.TokenSecret);
         var authHeader = OmniSigner.BuildHeader(token.TokenId, tokenSecret, method.Method, path, bodyBytes);
 
         using var req = new HttpRequestMessage(method, uri);
@@ -389,6 +393,14 @@ public sealed class OmniClient : IDisposable
         RandomNumberGenerator.Fill(buf);
         return buf;
 #endif
+    }
+
+    private static byte[] HexToBytes(string hex)
+    {
+        var bytes = new byte[hex.Length / 2];
+        for (var i = 0; i < bytes.Length; i++)
+            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        return bytes;
     }
 
     public void Dispose()

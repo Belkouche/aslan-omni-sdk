@@ -11,10 +11,23 @@ namespace Aslan.Omni.Auth;
 ///
 /// Format:  OMNI-TOKEN tokenId=&lt;uuid&gt;,ts=&lt;unix-seconds&gt;,sig=&lt;hex&gt;
 /// Message: "{tokenId}:{ts}:{METHOD}:{path}:{body-sha256-hex}"
-/// sig:     HMAC-SHA256(tokenSecret, message)
+/// sig:     HMAC-SHA256(derivedKey, message)
+///
+/// derivedKey = HMAC-SHA256(tokenSecret, tokenId)
+/// This matches the terminal's key derivation:
+///   tokenHmac = HMAC(tokenSecret, tokenId)   [stored on terminal]
+///   verify:     HMAC(hexToBytes(tokenHmac), message)
 /// </summary>
 internal static class OmniSigner
 {
+    // Derives the signing key the same way the terminal does:
+    // key = HMAC-SHA256(tokenSecret, tokenId)
+    internal static byte[] DeriveSigningKey(byte[] tokenSecret, string tokenId)
+    {
+        using var hmac = new HMACSHA256(tokenSecret);
+        return hmac.ComputeHash(Encoding.UTF8.GetBytes(tokenId));
+    }
+
     internal static string BuildHeader(
         string tokenId,
         byte[] tokenSecret,
@@ -36,7 +49,8 @@ internal static class OmniSigner
         var message = $"{tokenId}:{ts}:{method.ToUpperInvariant()}:{path}:{bodyHashHex}";
         var messageBytes = Encoding.UTF8.GetBytes(message);
 
-        using var hmac = new HMACSHA256(tokenSecret);
+        var signingKey = DeriveSigningKey(tokenSecret, tokenId);
+        using var hmac = new HMACSHA256(signingKey);
         var sigBytes = hmac.ComputeHash(messageBytes);
 #if NET48 || NETFRAMEWORK
         var sig = Net48Compat.ToHexString(sigBytes);

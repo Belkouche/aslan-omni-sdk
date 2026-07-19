@@ -6,7 +6,7 @@ namespace Aslan.Omni.Auth;
 internal sealed record SavedToken(
     string TerminalId,
     string TokenId,
-    string TokenSecret,   // base64-encoded raw secret
+    string TokenSecret,   // hex-encoded raw secret (as returned by the terminal at /pair/confirm)
     string IpAddress,
     int Port,
     string PosId,

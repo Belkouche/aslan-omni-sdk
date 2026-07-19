@@ -3,6 +3,7 @@
     <Project Path="src/Aslan.Omni/Aslan.Omni.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Aslan.Omni.Console/Aslan.Omni.Console.csproj" />
     <Project Path="tests/Aslan.Omni.Tests/Aslan.Omni.Tests.csproj" />
   </Folder>
 </Solution>

@@ -64,6 +64,47 @@ public class OmniSignerTests
         Assert.Matches(@"sig=[0-9a-f]{64}", h2);
     }
 
+    [Fact]
+    public void BuildHeader_SignatureVerifiesAgainstTerminalDerivation()
+    {
+        // Reproduces the terminal's verification (OmniHttpServer.kt + OmniCrypto.kt):
+        //   Pairing:  tokenSecret = randomBytes(32); returned to client as hex
+        //             tokenHmac   = HMAC-SHA256(tokenSecret, tokenId)  [stored, hex]
+        //   Verify:   message  = "{tokenId}:{ts}:{METHOD}:{path}:{sha256(body) hex}"
+        //             expected = HMAC-SHA256(hexToBytes(tokenHmac), message)  == sig
+        // The client only holds tokenSecret, so it must derive the same signing key.
+        var tokenId = "b3f1c2d4-0000-4000-8000-000000000001";
+        var tokenSecret = RandomNumberGenerator.GetBytes(32);
+        var body = Encoding.UTF8.GetBytes("{\"ref\":\"ORDER-1\",\"amountCents\":15000}");
+
+        var header = OmniSigner.BuildHeader(tokenId, tokenSecret, "POST", "/pay", body);
+
+        var ts = Regex.Match(header, @"ts=(\d+)").Groups[1].Value;
+        var sig = ExtractSig(header);
+
+        // Terminal side: key = HMAC(tokenSecret, tokenId), lowercase-hex hashes.
+        var tokenHmac = HmacHex(tokenSecret, Encoding.UTF8.GetBytes(tokenId));
+        var bodyHash = Convert.ToHexString(SHA256.HashData(body)).ToLowerInvariant();
+        var message = $"{tokenId}:{ts}:POST:/pay:{bodyHash}";
+        var expected = HmacHex(HexToBytes(tokenHmac), Encoding.UTF8.GetBytes(message));
+
+        Assert.Equal(expected, sig);
+    }
+
+    private static string HmacHex(byte[] key, byte[] data)
+    {
+        using var hmac = new HMACSHA256(key);
+        return Convert.ToHexString(hmac.ComputeHash(data)).ToLowerInvariant();
+    }
+
+    private static byte[] HexToBytes(string hex)
+    {
+        var bytes = new byte[hex.Length / 2];
+        for (var i = 0; i < bytes.Length; i++)
+            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        return bytes;
+    }
+
     private static string ExtractSig(string header)
         => Regex.Match(header, @"sig=([0-9a-f]+)").Groups[1].Value;
 }

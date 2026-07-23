@@ -10,9 +10,35 @@ Aslan Omni is a foreground service running on Sunmi P2/P3 terminals. It exposes 
 
 ## Installation
 
+`Aslan.Omni` is distributed as a **private NuGet package** on GitHub Packages (not
+public nuget.org). Ask Aslan for access, then add the feed and the package.
+
+1. Create a `nuget.config` next to your solution:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="aslan-github" value="https://nuget.pkg.github.com/Belkouche/index.json" />
+  </packageSources>
+  <packageSourceCredentials>
+    <aslan-github>
+      <add key="Username" value="YOUR_GITHUB_USERNAME" />
+      <!-- A GitHub Personal Access Token with the read:packages scope -->
+      <add key="ClearTextPassword" value="%GITHUB_PACKAGES_TOKEN%" />
+    </aslan-github>
+  </packageSourceCredentials>
+</configuration>
+```
+
+2. Install:
+
 ```bash
 dotnet add package Aslan.Omni
 ```
+
+> Store the token in an environment variable (`GITHUB_PACKAGES_TOKEN`), not in the
+> committed `nuget.config`.
 
 ---
 
@@ -38,6 +64,18 @@ There are two independent flows:
 
 1. **Local flow** — discovery, pairing, payment, reversal. Works entirely on LAN with no internet.
 2. **Cloud flow** — the terminal registers itself on the Aslan dashboard; completed transactions are uploaded for reporting. Optional, can be enabled from the terminal's settings screen.
+
+### Attended POS vs. kiosk / vending
+
+Your integration code is the same in both cases — the SDK API does not change:
+
+- **Attended POS** (a cashier reads the PIN, taps the card): works out of the box.
+- **Kiosk / vending / unattended**: the terminal can be provisioned so payments are
+  driven fully by your app with no operator. The Omni terminal handles the payment
+  path automatically (including terminals configured in NapsPay **ECR mode**), so an
+  approved payment is never auto-reversed. From the SDK you still just call
+  `PayAsync` / `ReverseAsync` — no extra steps. If you are deploying into vending or
+  self-service, tell Aslan so the terminal fleet is provisioned for unattended use.
 
 ---
 
@@ -69,7 +107,7 @@ if (!terminal.IsPaired)
 var result = await omni.PayAsync(terminal.Id, new PayRequest
 {
     Ref         = $"ORDER-{DateTime.UtcNow:yyyyMMddHHmmss}",
-    AmountCents = 15000,   // 150,00 DH
+    AmountCents = 15000,   // 150,00 MAD
     CashierId   = "CAISSIER-01",
     TillId      = "TILL-01",
     Description = "Table 7",
@@ -181,6 +219,13 @@ The terminal validates:
 
 If any check fails → `401 Unauthorized` → `OmniException(OmniErrorCode.Unauthorized)`.
 
+> **Clock skew — important.** The ±30 s window is checked against the **terminal's**
+> clock. If the terminal's date/time is wrong (drifted, or auto-time disabled),
+> every request fails with `401 Unauthorized` / `"timestamp out of window"` even
+> though the token is valid. If you hit persistent 401s that pairing doesn't fix,
+> enable **automatic date & time** on the terminal (Android Settings → System →
+> Date & time). The POS machine's own clock should also be network-synced.
+
 ---
 
 ## Payment
@@ -191,7 +236,7 @@ If any check fails → `401 Unauthorized` → `OmniException(OmniErrorCode.Unaut
 var result = await omni.PayAsync(terminal.Id, new PayRequest
 {
     Ref         = "ORDER-20260704-001",   // idempotency key, max 40 chars
-    AmountCents = 15000,                  // 150,00 DH
+    AmountCents = 15000,                  // 150,00 MAD
 });
 
 switch (result.Status)
@@ -476,7 +521,7 @@ try
     pay = await omni.PayAsync(terminal.Id, new PayRequest
     {
         Ref         = orderRef,
-        AmountCents = 25000,          // 250,00 DH
+        AmountCents = 25000,          // 250,00 MAD
         CashierId   = "CAISSIER-01",
         TillId      = "TILL-01",
         Description = "Commande #42",
@@ -494,7 +539,7 @@ if (pay.IsApproved)
     Console.WriteLine($"  Auth     : {pay.AuthNumber}");
     Console.WriteLine($"  STAN     : {pay.Stan}");
     Console.WriteLine($"  Card     : {pay.CardNumber}  {pay.CardScheme}");
-    Console.WriteLine($"  Amount   : {pay.AmountCents / 100m:F2} DH");
+    Console.WriteLine($"  Amount   : {pay.AmountCents / 100m:F2} MAD");
     Console.WriteLine($"  Date     : {pay.TransactionDate} {pay.TransactionTime}");
 
     // ── Reversal example (optional) ───────────────────────────────────────

@@ -1,0 +1,25 @@
+Aslan.Omni SDK — Proprietary License
+
+Copyright © ASLANPAY SARL. All rights reserved.
+
+This software and its source code are the confidential and proprietary property
+of ASLANPAY SARL ("Aslan"). It is licensed, not sold.
+
+Subject to the terms of a separate written agreement with Aslan, Aslan grants
+authorized integrators a non-exclusive, non-transferable, revocable license to
+use this SDK solely to integrate card payments with Aslan Omni terminals.
+
+You may NOT, without Aslan's prior written consent:
+  - redistribute, sublicense, sell, or publish this SDK or its source;
+  - reverse-engineer, decompile, or disassemble it except where such
+    restriction is prohibited by applicable law;
+  - use it to interoperate with non-Aslan payment terminals or to build a
+    competing payment-terminal SDK.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
+ASLAN BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE
+USE OF THIS SOFTWARE.
+
+For licensing enquiries: contact ASLANPAY SARL.

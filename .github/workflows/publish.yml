@@ -1,0 +1,63 @@
+name: publish
+
+# Publishes the Aslan.Omni NuGet package to GitHub Packages on a version tag
+# (e.g. `git tag v1.0.0 && git push origin v1.0.0`), and validates every push/PR.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test-pack:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      # net48 targets don't build on Linux; validate a .NET (Core) TFM here.
+      - name: Build
+        run: dotnet build src/Aslan.Omni/Aslan.Omni.csproj -c Release -f net9.0 --no-restore
+
+      - name: Test
+        run: dotnet test tests/Aslan.Omni.Tests/Aslan.Omni.Tests.csproj -c Release
+
+      - name: Pack
+        run: dotnet pack src/Aslan.Omni/Aslan.Omni.csproj -c Release -o ./artifacts
+        # Full multi-TFM pack (incl. net48) runs here; net48 ref assemblies are
+        # restored from NuGet so packing works on Linux even without the framework.
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: ./artifacts/*.nupkg
+
+      # Publish only when a v* tag is pushed.
+      - name: Publish to GitHub Packages
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          dotnet nuget add source \
+            --username ${{ github.actor }} \
+            --password ${{ secrets.GITHUB_TOKEN }} \
+            --store-password-in-clear-text \
+            --name github \
+            "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          dotnet nuget push "./artifacts/*.nupkg" \
+            --source github \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate

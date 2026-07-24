@@ -5,5 +5,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Aslan.Omni.Console/Aslan.Omni.Console.csproj" />
     <Project Path="tests/Aslan.Omni.Tests/Aslan.Omni.Tests.csproj" />
+    <Project Path="tests/Aslan.Omni.E2ETests/Aslan.Omni.E2ETests.csproj" />
   </Folder>
 </Solution>

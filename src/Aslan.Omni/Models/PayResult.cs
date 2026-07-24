@@ -13,6 +13,9 @@ public sealed record PayResult
     public bool IsTimeout => Status == "timeout";
     public bool IsReversed => Status == "reversed";
 
+    /// <summary>Cloud command identifier. Populated only for cloud-mode payments.</summary>
+    public string? CommandId { get; init; }
+
     /// <summary>ISO 8583 response code. "000" on approval.</summary>
     public string? ResponseCode { get; init; }
 

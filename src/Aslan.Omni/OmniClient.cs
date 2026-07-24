@@ -193,7 +193,7 @@ public sealed class OmniClient : IDisposable
             originalRef = request.OriginalRef,
             stan = request.Stan,
         };
-        return await PostSignedAsync<PayResult>(token, "/reversal", body, _options.PayTimeout, ct);
+        return await PostSignedAsync<PayResult>(token, "/reverse", body, _options.PayTimeout, ct);
     }
 
     // -------------------------------------------------------------------------

@@ -284,7 +284,13 @@ var result = await omni.PayAsync(terminal.Id, new PayRequest
 The `Ref` field is an idempotency key. If the same `Ref` is sent:
 
 - While already in-progress → `409 Conflict` → `OmniException(OmniErrorCode.Conflict)`
-- Within 24 hours of completion → cached result returned (no duplicate charge)
+- After completion → the cached result is returned (no duplicate charge)
+
+> **On the cache window:** completed results are currently kept with **no fixed
+> expiry** — a same-`Ref` replay returns the original result as long as the record
+> exists server-side. Don't build on that as a permanent guarantee, though: treat a
+> `Ref` as reconcilable **within the same business day** and settle timeouts promptly,
+> in case a retention/cleanup policy is introduced later.
 
 Use a unique ref per transaction. A good pattern: `$"ORDER-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"`.
 

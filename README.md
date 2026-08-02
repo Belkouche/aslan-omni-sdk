@@ -288,12 +288,42 @@ The `Ref` field is an idempotency key. If the same `Ref` is sent:
 
 Use a unique ref per transaction. A good pattern: `$"ORDER-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"`.
 
-### Timeout behaviour
+### Timeout behaviour & reconciliation
 
-The terminal allows 90 seconds for the cardholder to complete the payment. The SDK default is 95 seconds (`PayTimeout`). After timeout:
+The terminal allows ~90 s for the cardholder; the SDK default is 95 s (`PayTimeout`). On timeout
+you get a normal `PayResult` with `IsTimeout == true` (it does **not** throw).
 
-- Terminal returns `{ "status": "timeout" }` — NapsPay may still complete
-- Your code should reconcile via the dashboard or a reversal if needed
+**A timeout is not a failure — the card may still have been charged.** Never credit the order
+(or reverse) on a raw timeout. Reconcile first.
+
+**The rule that keeps you safe: reuse the same `Ref`.** `Ref` is a strict idempotency key —
+there's only ever one command per `Ref` server-side — so re-calling `PayAsync` with the *same*
+`Ref` **never double-charges**:
+
+```csharp
+var request = new PayRequest { Ref = "ORDER-001", AmountCents = 15000 };
+
+var result = await omni.PayAsync(terminal.Id, request);
+while (result.IsTimeout)
+{
+    // SAME request.Ref — never generate a new one. The server won't double-charge;
+    // it returns the real outcome once the terminal has one.
+    result = await omni.PayAsync(terminal.Id, request);
+}
+// result is now approved / declined / cancelled
+```
+
+- **Completed** → re-`PayAsync` returns the **original result** (same `AuthNumber`, `Stan`).
+- **Timed out** → the server re-sends the command to the terminal; no duplicate.
+- Prefer to just *check* without re-prompting the terminal? Poll the status — the timeout
+  `PayResult` carries a `CommandId`:
+
+```csharp
+var settled = await omni.PollResultAsync(result.CommandId!, TimeSpan.FromMinutes(2));
+```
+
+> ⚠️ **Never generate a new `Ref` to retry** — that's the only way to create a real double
+> charge. Same `Ref` = safe. If a charge is confirmed but unwanted, `ReverseAsync` it (below).
 
 ### Cancellation token
 

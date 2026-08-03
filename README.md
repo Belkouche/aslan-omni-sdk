@@ -152,7 +152,9 @@ The raw `tokenSecret` is never stored on the terminal — only its HMAC. If the 
 
 #### Migrating from v1.0.0
 
-**Nothing breaks and no re-pairing is needed.** Terminals paired with v1.0.0 keep working — the stored token is identical; the change only protects how the secret is delivered *during pairing*.
+> **Cloud integrators: this doesn't apply to you.** Encryption (#4b) only affects **LAN** pairing (`OmniClient.PairAsync`). The cloud path (`OmniCloudClient.PairAsync`, `PayAsync`, `ReverseAsync`, `GetDevicesAsync`) is **unchanged** and already TLS-protected — if you integrated over the cloud, you have **nothing to do** and no reason to upgrade for this.
+
+**Nothing breaks and no re-pairing is needed.** Terminals paired with v1.0.0 keep working — the stored token is identical; the change only protects how the secret is delivered *during LAN pairing*.
 
 - **Upgrading the package is the whole fix** — `dotnet add package Aslan.Omni --version 1.1.0`, no code change. Every new pairing on net9/net10 is then encrypted.
 - **If you stay on v1.0.0**, pairing still works but the token secret is sent in **cleartext** on the LAN — upgrading is recommended for the security fix.

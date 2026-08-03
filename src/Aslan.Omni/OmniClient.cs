@@ -114,8 +114,20 @@ public sealed class OmniClient : IDisposable
         var clientNonce = Convert.ToHexString(RandomBytes(16)).ToLowerInvariant();
 #endif
 
-        // Phase 1 — request
-        var reqBody = new { posId, posLabel, clientNonce };
+        // CRIT #4b: generate an ephemeral RSA keypair so the terminal can return
+        // the tokenSecret encrypted to us instead of in cleartext over the LAN.
+        // The SPKI export + OAEP-SHA256 decrypt APIs are .NET Core 3.0+ only, so
+        // net48 keeps the legacy cleartext path (the terminal is backward-compat).
+#if NET48 || NETFRAMEWORK
+        RSA? rsa = null;
+        string? clientPubKey = null;
+#else
+        using var rsa = RSA.Create(2048);
+        var clientPubKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+#endif
+
+        // Phase 1 — request (clientPubKey is null on net48 → omitted server-side)
+        var reqBody = new { posId, posLabel, clientNonce, clientPubKey };
         var phase1 = await PostAsync<Phase1Response>(
             terminal.BaseUri, "/pair/request", reqBody, signed: false,
             timeout: _options.DefaultTimeout, ct: ct);
@@ -131,10 +143,29 @@ public sealed class OmniClient : IDisposable
             terminal.BaseUri, "/pair/confirm", confirmBody, signed: false,
             timeout: _options.DefaultTimeout, ct: ct);
 
+        // Prefer the encrypted secret (RSA-OAEP-SHA256); fall back to the
+        // cleartext field for terminals that don't yet support #4b (or net48).
+        string tokenSecretHex;
+#if NET48 || NETFRAMEWORK
+        tokenSecretHex = phase3.TokenSecret;
+#else
+        if (!string.IsNullOrEmpty(phase3.EncryptedTokenSecret))
+        {
+            var decrypted = rsa.Decrypt(
+                Convert.FromBase64String(phase3.EncryptedTokenSecret!),
+                RSAEncryptionPadding.OaepSHA256);
+            tokenSecretHex = Convert.ToHexString(decrypted).ToLowerInvariant();
+        }
+        else
+        {
+            tokenSecretHex = phase3.TokenSecret;
+        }
+#endif
+
         var saved = new SavedToken(
             TerminalId:  terminal.Id,
             TokenId:     phase3.TokenId,
-            TokenSecret: phase3.TokenSecret,
+            TokenSecret: tokenSecretHex,
             IpAddress:   terminal.IpAddress,
             Port:        terminal.Port,
             PosId:       posId,
@@ -415,6 +446,9 @@ public sealed class OmniClient : IDisposable
     {
         public string TokenId { get; set; } = "";
         public string TokenSecret { get; set; } = "";
+        // Set when the terminal supports CRIT #4b: the tokenSecret encrypted to
+        // the ephemeral RSA key we sent, base64. Preferred over TokenSecret.
+        public string? EncryptedTokenSecret { get; set; }
         public string TerminalSerial { get; set; } = "";
         public string TerminalModel { get; set; } = "";
     }

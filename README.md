@@ -148,6 +148,16 @@ SDK saves (tokenId, tokenSecret, terminalId, ip) to disk
 
 The raw `tokenSecret` is never stored on the terminal — only its HMAC. If the POS machine is lost, its token can be revoked from any other paired POS.
 
+> **🔒 Encrypted pairing (since v1.1.0).** `PairAsync` generates an ephemeral RSA key and sends its public key in `/pair/request`; the terminal returns the token secret **encrypted (RSA-OAEP-SHA256)** so it never crosses the LAN in cleartext. Automatic — **no code change**. On **.NET Framework 4.8** the SPKI/OAEP APIs aren't available, so net48 keeps the legacy cleartext path (net9/net10 are encrypted). See the migration note below.
+
+#### Migrating from v1.0.0
+
+**Nothing breaks and no re-pairing is needed.** Terminals paired with v1.0.0 keep working — the stored token is identical; the change only protects how the secret is delivered *during pairing*.
+
+- **Upgrading the package is the whole fix** — `dotnet add package Aslan.Omni --version 1.1.0`, no code change. Every new pairing on net9/net10 is then encrypted.
+- **If you stay on v1.0.0**, pairing still works but the token secret is sent in **cleartext** on the LAN — upgrading is recommended for the security fix.
+- A v1.1.0 SDK still pairs with an older cleartext-only terminal (automatic fallback).
+
 ### Pairing in code
 
 ```csharp

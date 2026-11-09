@@ -224,7 +224,7 @@ public sealed class OmniClient : IDisposable
             originalRef = request.OriginalRef,
             stan = request.Stan,
         };
-        return await PostSignedAsync<PayResult>(token, "/reverse", body, _options.PayTimeout, ct);
+        return await PostSignedAsync<PayResult>(token, "/reversal", body, _options.PayTimeout, ct);
     }
 
     // -------------------------------------------------------------------------
@@ -240,19 +240,15 @@ public sealed class OmniClient : IDisposable
         var uri = new Uri(TerminalBase(token), "/admin/pos");
         var resp = await SendSignedAsync(HttpMethod.Get, uri, token, null,
             _options.DefaultTimeout, ct);
-        var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync()).RootElement;
-        var list = new List<PosInfo>();
-        foreach (var item in doc.GetProperty("pos").EnumerateArray())
+        var doc = await ParseResponseAsync<PosListResponse>(resp, "/admin/pos");
+        // The terminal sends createdAt as Unix epoch seconds.
+        return doc.Pos.Select(p => new PosInfo
         {
-            list.Add(new PosInfo
-            {
-                TokenId  = item.GetProperty("tokenId").GetString()!,
-                PosId    = item.GetProperty("posId").GetString()!,
-                PosLabel = item.GetProperty("posLabel").GetString()!,
-                PairedAt = DateTimeOffset.Parse(item.GetProperty("pairedAt").GetString()!),
-            });
-        }
-        return list;
+            TokenId  = p.TokenId,
+            PosId    = p.PosId,
+            PosLabel = p.PosLabel,
+            PairedAt = DateTimeOffset.FromUnixTimeSeconds(p.CreatedAt),
+        }).ToList();
     }
 
     /// <summary>
@@ -451,5 +447,13 @@ public sealed class OmniClient : IDisposable
         public string? EncryptedTokenSecret { get; set; }
         public string TerminalSerial { get; set; } = "";
         public string TerminalModel { get; set; } = "";
+    }
+    private sealed class PosListResponse { public List<PosListItem> Pos { get; set; } = new(); }
+    private sealed class PosListItem
+    {
+        public string TokenId { get; set; } = "";
+        public string PosId { get; set; } = "";
+        public string PosLabel { get; set; } = "";
+        public long CreatedAt { get; set; }
     }
 }
